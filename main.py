@@ -256,7 +256,7 @@ class OllamaRAG:
         context_from_web = self._find_resources_on_web(query_for_web)
         # summarize the context from web
         web_summary_prompt = f"""
-        You are an advanced AI assistant designed to extract key information from web sources.
+        You are an advanced AI assistant designed to extract key information from provided sources.
 
         ## **Task:**
         Summarize the most relevant and important insights from the retrieved web content to help answer the following user query:
