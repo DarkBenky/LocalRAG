@@ -8,6 +8,7 @@ import re
 CODDER_MODEL = "qwen2.5-coder:3b"
 DEEP_SEEK_MODEL = "deepseek-r1:1.5b"
 CODDER_MODEL_BIG = "qwen2.5-coder:14b"
+CODDER_MODEL_SMALL = "qwen2.5-coder:1.5b"
 
 class OllamaRAG:
     def __init__(self, model_name: str = CODDER_MODEL, db_path: str = "ragV2.db"):
