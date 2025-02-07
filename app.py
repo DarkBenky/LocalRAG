@@ -53,7 +53,8 @@ elif page == "Resources":
     # Get and display resources
     resources = rag.db.get_all_resources()
     if resources:
-        df = pd.DataFrame(resources, columns=["ID", "Name", "Description", "Content", "Created At"])
+        st.write("Total Resources:", len(resources))
+        df = pd.DataFrame(resources, columns=["ID", "Name", "Description", "Content", "Created At", "Tags"])
         st.dataframe(df, use_container_width=True)
         
         # Resource details expander
@@ -74,7 +75,10 @@ elif page == "Conversation History":
     st.title("💭 Conversation History")
     
     conversations = rag.db.get_all_conversations()
+    
     if conversations:
+        st.write("Total Conversations:", len(conversations))
+        # st.write(conversations)
         df = pd.DataFrame(conversations, 
                          columns=["ID", "User Input", "Assistant Response", "Created At"])
         st.dataframe(df, use_container_width=True)

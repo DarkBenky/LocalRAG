@@ -2,13 +2,16 @@ import requests
 from RAG_DB import RAGDB
 from bs4 import BeautifulSoup
 from duckduckgo_search import DDGS
+import time
+import re
 
 class OllamaRAG:
-    def __init__(self, model_name: str = "qwen2.5-coder:3b", db_path: str = "rag.db"):
+    def __init__(self, model_name: str = "qwen2.5-coder:3b", db_path: str = "ragV2.db"):
         self.model_name = model_name
         self.api_url = "http://localhost:11434/api/generate"
         self.db = RAGDB(db_path)
         self.number_of_previous_conversations = 15
+        self.generate_tags_for_resource()
 
     def _call_ollama(self, prompt: str) -> str:
         payload = {
@@ -44,8 +47,26 @@ class OllamaRAG:
         """
         description = self._call_ollama(description_prompt)
 
+        tags_prompt = f"""
+        You are an AI assistant responsible for generating relevant tags for a given resource.
+
+        ### Resource Content:
+        {content}
+
+        ### Instructions:
+        - Provide **3-7 highly relevant** tags that best describe the resource.
+        - Tags should be **short, precise, and meaningful** (e.g., 'Machine Learning', 'Cybersecurity').
+        - If the resource covers multiple topics, include diverse yet related tags.
+        - **Avoid generic words** like "information", "article", or "document".
+
+        ### Generated Tags (comma-separated):
+        """
+
+        tags = self._call_ollama(tags_prompt)
+
+
         # **Add resource to the database**
-        self.db.add_resource(name, content, description)
+        self.db.add_resource(name, content, description, tags)
 
 
     def _get_relevant_context(self, query: str, n_results: int = 3) -> str:
@@ -151,39 +172,68 @@ class OllamaRAG:
     def _find_resources_on_web(self, query: str, num_results: int = 3) -> str:
         try:
             # Search web using DuckDuckGo
+            cleaned_query = query.replace('"', '').replace("'", "").strip()
             with DDGS() as ddgs:
-                results = [r for r in ddgs.text(query, max_results=num_results)]
+                results = [r for r in ddgs.text(cleaned_query, max_results=num_results)]
             
             web_resources = []
             for result in results:
                 try:
+                    # Rate limiting
+                    time.sleep(0.1)
+                    
                     # Get webpage content
-                    response = requests.get(result['link'], timeout=5)
+                    url = result['href']
+                    headers = {'User-Agent': 'Mozilla/5.0'}
+                    response = requests.get(url, headers=headers, timeout=10)
                     soup = BeautifulSoup(response.text, 'html.parser')
                     
-                    # Extract main content and clean it
-                    content = ' '.join([p.text for p in soup.find_all('p')])
-                    content = content[:500]  # Limit content length
+                    # Remove unwanted elements
+                    for tag in soup(['script', 'style', 'nav', 'footer', 'header']):
+                        tag.decompose()
+
+                    # Get relevant content with more semantic tags
+                    content_tags = soup.find_all(['p', 'h1', 'h2', 'h3', 'article', 'section', 'main'])
+                    content = " ".join(tag.get_text(strip=True) for tag in content_tags)
                     
-                    # Add as resource to DB
+                    # Clean and normalize text
+                    content = re.sub(r'\s+', ' ', content)  # Remove extra whitespace
+                    content = re.sub(r'[^\w\s.,!?-]', '', content)  # Keep basic punctuation
+                    content = content[:5000]  # Limit content length
+                    
+                    # Basic relevance check
+                    if not any(term.lower() in content.lower() for term in query.split()):
+                        continue
+
                     name = result['title']
-                    self.add_resource(
-                        name=name,
-                        content=content
-                    )
+                    print(f"Web Resource: {name} - {url}")
+                    
+                    if content.__contains__('404') or content.__contains__('Page not found') or content.__contains__('denied'):
+                        continue
+
+                    # # Add as resource to DB
+                    # self.add_resource(
+                    #     name=name,
+                    #     content=content
+                    # )
                     
                     web_resources.append({
                         'name': name,
-                        'content': content
+                        'content': content,
+                        'url': url
                     })
                     
+                except requests.RequestException as e:
+                    print(f"Request error for {url}: {str(e)}")
+                    continue
                 except Exception as e:
+                    print(f"Error processing {url}: {str(e)}")
                     continue
                     
             # Format context from web resources
             if web_resources:
                 context = "\n\n".join([
-                    f"From web ({r['name']}): {r['content']}" 
+                    f"From {r['url']} ({r['name']}): {r['content']}" 
                     for r in web_resources
                 ])
                 return context
@@ -229,6 +279,28 @@ class OllamaRAG:
         
         summary = self._call_ollama(summary_prompt)
         return summary
+    
+    def generate_tags_for_resource(self):
+        # iterate over all resources in the database if tags are not present then generate tags
+        resources = self.db.resources_with_empty_tags()
+        for resource in resources:
+            tags_prompt = f"""
+            You are an AI assistant responsible for generating relevant tags for a given resource.
+
+            ### Resource Content:
+            {resource[3]}
+
+            ### Instructions:
+            - Provide **3-7 highly relevant** tags that best describe the resource.
+            - Tags should be **short, precise, and meaningful** (e.g., 'Machine Learning', 'Cybersecurity').
+            - If the resource covers multiple topics, include diverse yet related tags.
+            - **Avoid generic words** like "information", "article", or "document".
+
+            ### Generated Tags (comma-separated):
+            """
+
+            tags = self._call_ollama(tags_prompt)
+            self.db.update_tags(resource[0], tags)
 
 
     def chat(self, user_input: str) -> str:
@@ -253,7 +325,7 @@ class OllamaRAG:
 
         query_for_web = self._call_ollama(query_for_web)
 
-        context_from_web = self._find_resources_on_web(query_for_web)
+        context_from_web = self._find_resources_on_web(query_for_web, num_results=5)
         # summarize the context from web
         web_summary_prompt = f"""
         You are an advanced AI assistant designed to extract key information from provided sources.
