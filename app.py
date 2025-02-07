@@ -42,8 +42,23 @@ if page == "Chat":
 
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
-            response = rag.chat(prompt)
+            response, resources = rag.chat(prompt)
             message_placeholder.write(response)
+            
+            if resources:
+                st.write("### Relevant Resources:")
+                for resource in resources:
+                    try:
+                        # Create clickable link with proper syntax
+                        st.markdown(f"[{resource['name']}]({resource['url']})")
+                        
+                        # Optional: Display metadata
+                        with st.expander("Details"):
+                            st.write(f"Description: {resource['description']}")
+                            st.write(f"Tags: {resource['tags']}")
+                    except Exception as e:
+                        st.error(f"Error displaying resource: {str(e)}")
+                        
             st.session_state.messages.append({"role": "assistant", "content": response})
 
 # Resources Page

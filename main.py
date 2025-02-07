@@ -14,7 +14,7 @@ class OllamaRAG:
         self.model_name = model_name
         self.api_url = "http://localhost:11434/api/generate"
         self.db = RAGDB(db_path)
-        self.number_of_previous_conversations = 15
+        self.number_of_previous_conversations = 8
         self.generate_tags_for_resource()
 
     def _call_ollama(self, prompt: str) -> str:
@@ -26,12 +26,14 @@ class OllamaRAG:
         response = requests.post(self.api_url, json=payload)
         return response.json()['response']
     
-    def add_resource(self, name: str, content: str):
+    def add_resource(self, name: str, content: str) -> dict:
         """
         Adds a new resource to the database with an AI-generated description.
 
         - Generates a **concise and informative** description of the resource content.
         - Ensures the description is **clear, relevant, and useful** for future retrieval.
+
+        Returns a dictionary containing the resource name, description, and tags.
         """
 
         # **Optimized Description Prompt**
@@ -71,6 +73,8 @@ class OllamaRAG:
 
         # **Add resource to the database**
         self.db.add_resource(name, content, description, tags)
+
+        return {"name": name, "description": description, "tags": tags}
 
 
     def _get_relevant_context(self, query: str, n_results: int = 3) -> str:
@@ -152,6 +156,9 @@ class OllamaRAG:
             ### Resource Content:
             {resource['content']}
 
+            ### Resource Description:
+            {resource['description']}
+
             ### Instructions:
             - Score must be **between 1 and 100**.
             - A **higher score (closer to 100)** means the resource is very relevant.
@@ -162,6 +169,9 @@ class OllamaRAG:
             """
             r = self._call_ollama(rank_prompt)
 
+            print(f"Resource: {resource['name']} - Score: {r}")
+            # print(f"Description: {resource['description']}")
+
             # Extract numeric score from response
             resource['score'] = next((word for word in r.split() if word.isdigit()), "0")
 
@@ -170,10 +180,15 @@ class OllamaRAG:
 
         # **Step 6: Format and Return Context**
         context = "\n".join([f"{r['name']}: {r['content']}" for r in res_list])
+
+        resV2 = self.db._search_resources_new(query, n_results)
+        if resV2 != "":
+            context += "\n\n" + resV2
+            print("Context from new search: ", resV2)
         return context
 
     
-    def _find_resources_on_web(self, query: str, num_results: int = 3) -> str:
+    def _find_resources_on_web(self, query: str, num_results: int = 3):
         try:
             # Search web using DuckDuckGo
             cleaned_query = query.replace('"', '').replace("'", "").strip()
@@ -203,7 +218,7 @@ class OllamaRAG:
                     # Clean and normalize text
                     content = re.sub(r'\s+', ' ', content)  # Remove extra whitespace
                     content = re.sub(r'[^\w\s.,!?-]', '', content)  # Keep basic punctuation
-                    content = content[:5000]  # Limit content length
+                    content = content[:8196]  # Limit content length
                     
                     # Basic relevance check
                     if not any(term.lower() in content.lower() for term in query.split()):
@@ -215,16 +230,17 @@ class OllamaRAG:
                     if content.__contains__('404') or content.__contains__('Page not found') or content.__contains__('denied'):
                         continue
 
-                    # # Add as resource to DB
-                    # self.add_resource(
-                    #     name=name,
-                    #     content=content
-                    # )
+                    # Add to web resources to db for future reference
+                    r = self.add_resource(name, content)
+
+                    print(f"Resource added: {r}")
                     
                     web_resources.append({
                         'name': name,
                         'content': content,
-                        'url': url
+                        'url': url,
+                        'tags': r['tags'],
+                        'description': r['description']
                     })
                     
                 except requests.RequestException as e:
@@ -240,13 +256,14 @@ class OllamaRAG:
                     f"From {r['url']} ({r['name']}): {r['content']}" 
                     for r in web_resources
                 ])
-                return context
+                
+                return context , web_resources
             
-            return ""
+            return "" , []
             
         except Exception as e:
             print(f"Error searching web: {str(e)}")
-            return ""
+            return "" , []
     
     def _summarize_previous_conversations(self) -> str:
         """
@@ -307,7 +324,7 @@ class OllamaRAG:
             self.db.update_tags(resource[0], tags)
 
 
-    def chat(self, user_input: str) -> str:
+    def chat(self, user_input: str):
         # Get relevant context from database
         context = self._get_relevant_context(user_input)
 
@@ -329,7 +346,7 @@ class OllamaRAG:
 
         query_for_web = self._call_ollama(query_for_web)
 
-        context_from_web = self._find_resources_on_web(query_for_web, num_results=5)
+        context_from_web , resources = self._find_resources_on_web(query_for_web, num_results=4)
         # summarize the context from web
         web_summary_prompt = f"""
         You are an advanced AI assistant designed to extract key information from provided sources.
@@ -387,7 +404,7 @@ class OllamaRAG:
         # Store conversation in database
         self.db.add_conversation(user_input, response)
         
-        return response
+        return response , resources
 
 def main():
     # Initialize RAG system

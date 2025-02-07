@@ -127,3 +127,57 @@ class RAGDB:
                 (f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%')
             )
             return cursor.fetchall()
+        
+    def _search_resources_new(self, query: str, n_results: int = 3) -> str:
+        try:
+            # Tokenize and clean query
+            query_terms = set(word.lower() for word in query.split())
+            
+            # Get resources from SQLite DB
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT name, content, tags FROM resources')
+                resources = cursor.fetchall()
+            
+            res_list = []
+            for name, content, tags in resources:
+                # Calculate relevance scores
+                content_terms = set(word.lower() for word in content.split())
+                name_terms = set(word.lower() for word in name.split())
+                tag_terms = set(word.lower() for word in (tags or '').split(','))
+                
+                # Weighted scoring
+                name_matches = len(query_terms & name_terms) * 3.0  # Higher weight for name
+                content_matches = len(query_terms & content_terms)
+                tag_matches = len(query_terms & tag_terms) * 2.0    # Medium weight for tags
+                
+                total_score = name_matches + content_matches + tag_matches
+                
+                # Include if matches found
+                if total_score > 0:
+                    # Limit content length for display
+                    display_content = content[:500] + '...' if len(content) > 500 else content
+                    
+                    res_list.append({
+                        'name': name,
+                        'content': display_content,
+                        'score': total_score,
+                        'tags': tags or ''
+                    })
+
+            # Sort by score and limit results
+            res_list = sorted(res_list, key=lambda x: float(x['score']), reverse=True)[:n_results]
+
+            # Format results with metadata
+            context = "\n\n".join([
+                f"Source: {r['name']} (Score: {r['score']:.1f})\n"
+                f"Tags: {r['tags']}\n"
+                f"Content: {r['content']}" 
+                for r in res_list
+            ])
+            
+            return context if res_list else ""
+
+        except Exception as e:
+            print(f"Search error: {str(e)}")
+            return ""
