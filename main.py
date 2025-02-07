@@ -5,8 +5,12 @@ from duckduckgo_search import DDGS
 import time
 import re
 
+CODDER_MODEL = "qwen2.5-coder:3b"
+DEEP_SEEK_MODEL = "deepseek-r1:1.5b"
+CODDER_MODEL_BIG = "qwen2.5-coder:14b"
+
 class OllamaRAG:
-    def __init__(self, model_name: str = "qwen2.5-coder:3b", db_path: str = "ragV2.db"):
+    def __init__(self, model_name: str = CODDER_MODEL, db_path: str = "ragV2.db"):
         self.model_name = model_name
         self.api_url = "http://localhost:11434/api/generate"
         self.db = RAGDB(db_path)
