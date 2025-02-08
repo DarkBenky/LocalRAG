@@ -13,7 +13,7 @@ CODDER_MODEL_SUPPER_SMALL = "qwen2.5-coder:0.5b"
 DEEP_SEEK_MODEL_BIG = "deepseek-r1:32b"
 
 class OllamaRAG:
-    def __init__(self, model_name: str = CODDER_MODEL_BIG, db_path: str = "ragV2.db", performance: bool = True , web_search: bool = True, context_search: bool = True):
+    def __init__(self, model_name: str = CODDER_MODEL, db_path: str = "ragV2.db", performance: bool = True , web_search: bool = True, context_search: bool = True):
         self.model_name = model_name
         self.api_url = "http://localhost:11434/api/generate"
         self.db = RAGDB(db_path)

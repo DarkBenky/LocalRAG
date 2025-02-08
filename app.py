@@ -25,8 +25,8 @@ if "context_search" not in st.session_state:
 with st.sidebar:
     st.title("⚙️ Settings")
     model_options = {
-        "Qwen 14B": CODDER_MODEL_BIG,
         "Qwen 3B": CODDER_MODEL,
+        "Qwen 14B": CODDER_MODEL_BIG,
         "Qwen 1.5B": CODDER_MODEL_SMALL,
         "DeepSeek 32B": DEEP_SEEK_MODEL_BIG,
         "DeepSeek 1.5B": DEEP_SEEK_MODEL
