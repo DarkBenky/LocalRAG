@@ -10,9 +10,10 @@ DEEP_SEEK_MODEL = "deepseek-r1:1.5b"
 CODDER_MODEL_BIG = "qwen2.5-coder:14b"
 CODDER_MODEL_SMALL = "qwen2.5-coder:1.5b"
 CODDER_MODEL_SUPPER_SMALL = "qwen2.5-coder:0.5b"
+DEEP_SEEK_MODEL_BIG = "deepseek-r1:32b"
 
 class OllamaRAG:
-    def __init__(self, model_name: str = CODDER_MODEL_SMALL, db_path: str = "ragV2.db", performance: bool = True):
+    def __init__(self, model_name: str = CODDER_MODEL_BIG, db_path: str = "ragV2.db", performance: bool = True):
         self.model_name = model_name
         self.api_url = "http://localhost:11434/api/generate"
         self.db = RAGDB(db_path)
@@ -198,7 +199,7 @@ class OllamaRAG:
         resV2 = self.db._search_resources_new(query, n_results, 2048)
         resV2 += self.db._search_resources_new(description, n_results, 2048)
         for k in keywords:
-            resV2 += self.db._search_resources_new(k, n_results, 512)
+            resV2 += self.db._search_resources_new(k, n_results, 2048)
 
         seen = set()
         if resV2:

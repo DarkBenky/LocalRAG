@@ -1,12 +1,15 @@
 import sqlite3
 from datetime import datetime
 from typing import Optional, List, Tuple
+from functools import lru_cache
 
 class RAGDB:
     def __init__(self, db_path: str = "ragV2.db"):
         self.db_path = db_path
         self._create_tables()
         # self.migrateV1()
+        self.new_resources = []
+        self.new_conversations = []
 
     def migrateV1(self):
         try:
@@ -62,6 +65,12 @@ class RAGDB:
                 'INSERT INTO resources (name, description, content, tags) VALUES (?, ?, ?, ?)',
                 (name, description, content, tags)
             )
+            self.new_resources.append({
+                "name": name,
+                "content": content,
+                "description": description,
+                "tags": tags
+            })
             return cursor.lastrowid
         
     def update_tags(self, resource_id: int, tags: str) -> None:
@@ -86,6 +95,10 @@ class RAGDB:
                 'INSERT INTO conversations (user_input, assistant_response) VALUES (?, ?)',
                 (user_input, assistant_response)
             )
+            self.new_conversations.append({
+                "user_input": user_input,
+                "assistant_response": assistant_response
+            })
             return cursor.lastrowid
 
     def get_resource(self, resource_id: int) -> Optional[Tuple]:
@@ -127,7 +140,8 @@ class RAGDB:
                 (f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%')
             )
             return cursor.fetchall()
-        
+    
+    @lru_cache(maxsize=4096)
     def _search_resources_new(self, query: str, n_results: int = 3, content_length : int = 2048) -> list:
         try:
             # Tokenize and clean query
