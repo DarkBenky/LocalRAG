@@ -11,6 +11,8 @@ CODDER_MODEL_BIG = "qwen2.5-coder:14b"
 CODDER_MODEL_SMALL = "qwen2.5-coder:1.5b"
 CODDER_MODEL_SUPPER_SMALL = "qwen2.5-coder:0.5b"
 DEEP_SEEK_MODEL_BIG = "deepseek-r1:32b"
+DEEP_SEEK_MODEL_NORMAL = "deepseek-r1:8b"
+
 
 class OllamaRAG:
     def __init__(self, model_name: str = CODDER_MODEL, db_path: str = "ragV2.db", performance: bool = True , web_search: bool = True, context_search: bool = True):
@@ -388,7 +390,7 @@ class OllamaRAG:
             print("Average time for word generation: ", (time.time() - start) / len(query_for_web.split()))
             print(f"-"*15)
 
-            context_from_web , resources = self._find_resources_on_web(query_for_web, num_results=5)
+            context_from_web , resources = self._find_resources_on_web(query_for_web, num_results=3)
             # summarize the context from web
             web_summary_prompt = f"""
             You are an advanced AI assistant designed to extract key information from provided sources.
