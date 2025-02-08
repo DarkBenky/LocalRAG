@@ -13,7 +13,7 @@ st.set_page_config(
 # Initialize RAG system
 @st.cache_resource
 def init_rag():
-    return OllamaRAG()
+    return OllamaRAG(performance=True)
 
 rag = init_rag()
 

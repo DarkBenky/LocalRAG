@@ -9,14 +9,16 @@ CODDER_MODEL = "qwen2.5-coder:3b"
 DEEP_SEEK_MODEL = "deepseek-r1:1.5b"
 CODDER_MODEL_BIG = "qwen2.5-coder:14b"
 CODDER_MODEL_SMALL = "qwen2.5-coder:1.5b"
+CODDER_MODEL_SUPPER_SMALL = "qwen2.5-coder:0.5b"
 
 class OllamaRAG:
-    def __init__(self, model_name: str = CODDER_MODEL, db_path: str = "ragV2.db"):
+    def __init__(self, model_name: str = CODDER_MODEL, db_path: str = "ragV2.db", performance: bool = True):
         self.model_name = model_name
         self.api_url = "http://localhost:11434/api/generate"
         self.db = RAGDB(db_path)
         self.number_of_previous_conversations = 8
         self.generate_tags_for_resource()
+        self.performance = performance
 
     def _call_ollama(self, prompt: str) -> str:
         payload = {
@@ -87,6 +89,8 @@ class OllamaRAG:
         4. Returning the top `n_results` as a formatted string.
         """
 
+        context = ""
+
         # **Step 1: Generate an Optimized Search Description**
         search_query_prompt = f"""
         You are an expert in information retrieval. Given the following user query, generate a concise and optimized search description that captures its key intent and meaning.
@@ -103,19 +107,20 @@ class OllamaRAG:
         """
         description = self._call_ollama(search_query_prompt)
 
-        # **Step 2: Search for Initial Resources in the Database**
-        resources = self.db.search_resources(description)
+        if self.performance == False:
+            # **Step 2: Search for Initial Resources in the Database**
+            resources = self.db.search_resources(description)
 
-        # Convert tuples to a dictionary format
-        res_list = []
-        for r in resources:
-            res_list.append({
-                'id': r[0],
-                'name': r[1],
-                'description': r[2],
-                'content': r[3],
-                'score': 0
-            })
+            # Convert tuples to a dictionary format
+            res_list = []
+            for r in resources:
+                res_list.append({
+                    'id': r[0],
+                    'name': r[1],
+                    'description': r[2],
+                    'content': r[3],
+                    'score': 0
+                })
 
         # **Step 3: Generate Additional Keywords for Better Resource Discovery**
         keywords_prompt = f"""
@@ -135,57 +140,74 @@ class OllamaRAG:
 
         # Split keywords and search for additional resources
         keywords = [keyword.strip() for keyword in keywords.split(',')]
-        for keyword in keywords:
-            more_res = self.db.search_resources(keyword)
-            for mr in more_res:
-                res_list.append({
-                    'id': mr[0],
-                    'name': mr[1],
-                    'description': mr[2],
-                    'content': mr[3],
-                    'score': 0
-                })
 
-        # **Step 4: Rank Resources by Relevance Using LLM**
-        for resource in res_list:
-            rank_prompt = f"""
-            You are an AI ranking system. Given the **user query** and a **resource**, assign a **relevance score from 1 to 100** based on how useful the resource is in answering the query.
+        if self.performance == False:
+            for keyword in keywords:
+                more_res = self.db.search_resources(keyword)
+                for mr in more_res:
+                    res_list.append({
+                        'id': mr[0],
+                        'name': mr[1],
+                        'description': mr[2],
+                        'content': mr[3],
+                        'score': 0
+                    })
 
-            ### User Query:
-            {query}
+            # **Step 4: Rank Resources by Relevance Using LLM**
+            for resource in res_list:
+                rank_prompt = f"""
+                You are an AI ranking system. Given the **user query** and a **resource**, assign a **relevance score from 1 to 100** based on how useful the resource is in answering the query.
 
-            ### Resource Content:
-            {resource['content']}
+                ### User Query:
+                {query}
 
-            ### Resource Description:
-            {resource['description']}
+                ### Resource Content:
+                {resource['content']}
 
-            ### Instructions:
-            - Score must be **between 1 and 100**.
-            - A **higher score (closer to 100)** means the resource is very relevant.
-            - A **lower score (closer to 1)** means the resource is mostly irrelevant.
-            - Provide **only** the numerical score (no explanations).
+                ### Resource Description:
+                {resource['description']}
 
-            ### Relevance Score:
-            """
-            r = self._call_ollama(rank_prompt)
+                ### Instructions:
+                - Score must be **between 1 and 100**.
+                - A **higher score (closer to 100)** means the resource is very relevant.
+                - A **lower score (closer to 1)** means the resource is mostly irrelevant.
+                - Provide **only** the numerical score (no explanations).
 
-            print(f"Resource: {resource['name']} - Score: {r}")
-            # print(f"Description: {resource['description']}")
+                ### Relevance Score:
+                """
+                r = self._call_ollama(rank_prompt)
 
-            # Extract numeric score from response
-            resource['score'] = next((word for word in r.split() if word.isdigit()), "0")
+                print(f"Resource: {resource['name']} - Score: {r}")
+                # print(f"Description: {resource['description']}")
 
-        # **Step 5: Select Top `n_results` Resources**
-        res_list = sorted(res_list, key=lambda x: float(x['score']), reverse=True)[:n_results]
+                # Extract numeric score from response
+                resource['score'] = next((word for word in r.split() if word.isdigit()), "0")
 
-        # **Step 6: Format and Return Context**
-        context = "\n".join([f"{r['name']}: {r['content']}" for r in res_list])
+            # **Step 5: Select Top `n_results` Resources**
+            res_list = sorted(res_list, key=lambda x: float(x['score']), reverse=True)[:n_results]
 
-        resV2 = self.db._search_resources_new(query, n_results)
-        if resV2 != "":
-            context += "\n\n" + resV2
-            print("Context from new search: ", resV2)
+            # **Step 6: Format and Return Context**
+            context = "\n".join([f"{r['name']}: {r['content']}" for r in res_list])
+
+        resV2 = self.db._search_resources_new(query, n_results, 2048)
+        resV2 += self.db._search_resources_new(description, n_results, 2048)
+        for k in keywords:
+            resV2 += self.db._search_resources_new(k, n_results, 512)
+
+        seen = set()
+        if resV2:
+            resV2 = [x for x in resV2 if x['name'] not in seen and not seen.add(x['name'])]
+            resV2 = sorted(resV2, key=lambda x: float(x['score']), reverse=True)[:n_results]
+            resV2 = "\n\n".join([f"{r['name']}: {r['content']} : {r['description']}" for r in resV2])
+        else:
+            resV2 = ""
+        
+
+        print("-"*15)
+        print("V2 DB query: ",resV2)
+        print("-"*15)
+        context += resV2
+        
         return context
 
     
@@ -328,6 +350,8 @@ class OllamaRAG:
     def chat(self, user_input: str):
         # Get relevant context from database
         context = self._get_relevant_context(user_input)
+        print(f"Context: {context}")
+        print("-"*15)
 
         # create query for web search
         query_for_web = f"""
