@@ -13,13 +13,15 @@ CODDER_MODEL_SUPPER_SMALL = "qwen2.5-coder:0.5b"
 DEEP_SEEK_MODEL_BIG = "deepseek-r1:32b"
 
 class OllamaRAG:
-    def __init__(self, model_name: str = CODDER_MODEL_BIG, db_path: str = "ragV2.db", performance: bool = True):
+    def __init__(self, model_name: str = CODDER_MODEL_BIG, db_path: str = "ragV2.db", performance: bool = True , web_search: bool = True, context_search: bool = True):
         self.model_name = model_name
         self.api_url = "http://localhost:11434/api/generate"
         self.db = RAGDB(db_path)
         self.number_of_previous_conversations = 8
         self.generate_tags_for_resource()
         self.performance = performance
+        self.web_search = web_search
+        self.context_search = context_search
 
     def _call_ollama(self, prompt: str) -> str:
         payload = {
@@ -355,86 +357,113 @@ class OllamaRAG:
 
 
     def chat(self, user_input: str):
-        # Get relevant context from database
-        context = self._get_relevant_context(user_input)
-        print(f"Context: {context}")
-        print("-"*15)
-
-        # create query for web search
-        query_for_web = f"""
-        Generate an effective and precise search query that can be used to find high-quality, relevant, and up-to-date information from the web. 
-        The query should be optimized for search engines like Google and focus on retrieving authoritative sources, blogs, research papers, or forums.
-
-        Context: {user_input}
-
-        Ensure the query:
-        - Uses relevant keywords and phrases.
-        - Avoids unnecessary words or ambiguity.
-        - Targets reputable sources for the best information.
-        - Is structured concisely for accurate search results.
-
-        Provide only the search query without additional explanation.
-        """
-
-        start = time.time()
-        query_for_web = self._call_ollama(query_for_web)
-        print("Average time for word generation: ", (time.time() - start) / len(query_for_web.split()))
-        print(f"-"*15)
-
-        context_from_web , resources = self._find_resources_on_web(query_for_web, num_results=3)
-        # summarize the context from web
-        web_summary_prompt = f"""
-        You are an advanced AI assistant designed to extract key information from provided sources.
-
-        ## **Task:**
-        Summarize the most relevant and important insights from the retrieved web content to help answer the following user query:
-
-        ### **User Query:**
-        {user_input}
-
-        ## **Web Content:**
-        {context_from_web}
-
-        ## **Instructions:**
-        1. **Extract Key Insights:** Identify the most valuable information relevant to answering the user’s query.
-        2. **Filter Out Irrelevant Details:** Remove redundant or off-topic content.
-        3. **Summarize Clearly and Concisely:** Provide a structured summary in a few paragraphs or bullet points.
-        4. **Prioritize Recent & Reliable Sources:** Highlight the most authoritative and up-to-date information.
-        5. **Maintain Neutrality:** Present the summary in an objective manner without adding opinions.
-
-        ## **Output Format:**
-        Provide a structured summary that is easy to understand and directly useful in answering the user’s query.
-        """
-        start = time.time()
-        context_from_web = self._call_ollama(web_summary_prompt)
-        print("Average time for word generation: ", (time.time() - start) / len(context_from_web.split()))
-        print(f"-"*15)
+        # Initialize empty context
+        context = ""
         
-        # Create RAG prompt
-        rag_prompt = f"""
-        You are an intelligent assistant designed to provide accurate and context-aware responses. 
+        # Get relevant context from database only if enabled
+        if self.context_search:
+            context = self._get_relevant_context(user_input)
+            print(f"Context: {context}")
+            print("-"*15)
 
-        ## **Context Information:**
-        {context}
+        if self.web_search:
+            # create query for web search
+            query_for_web = f"""
+            Generate an effective and precise search query that can be used to find high-quality, relevant, and up-to-date information from the web. 
+            The query should be optimized for search engines like Google and focus on retrieving authoritative sources, blogs, research papers, or forums.
 
-        ## **Web Search Results:**
-        {context_from_web}
+            Context: {user_input}
 
-        ## **User Conversation History (Last {self.number_of_previous_conversations} interactions):**
-        {self._summarize_previous_conversations()}
+            Ensure the query:
+            - Uses relevant keywords and phrases.
+            - Avoids unnecessary words or ambiguity.
+            - Targets reputable sources for the best information.
+            - Is structured concisely for accurate search results.
 
-        ### **Instructions:**
-        1. **Synthesize Information:** Combine relevant details from the provided context, web search results, and past conversations.
-        2. **Prioritize Relevance:** Focus on the most important and up-to-date facts to answer the question accurately.
-        3. **Ensure Clarity & Conciseness:** The response should be clear, well-structured, and concise while covering key points.
-        4. **Avoid Redundancy:** If a previous conversation already addressed this, summarize the past response and add new insights if necessary.
-        5. **Cite Sources If Applicable:** If information is derived from web search results, indicate it subtly.
+            Provide only the search query without additional explanation.
+            """
 
-        ### **User Query:**
-        {user_input}
+            start = time.time()
+            query_for_web = self._call_ollama(query_for_web)
+            print("Average time for word generation: ", (time.time() - start) / len(query_for_web.split()))
+            print(f"-"*15)
 
-        ### **Your Response:**
-        """
+            context_from_web , resources = self._find_resources_on_web(query_for_web, num_results=5)
+            # summarize the context from web
+            web_summary_prompt = f"""
+            You are an advanced AI assistant designed to extract key information from provided sources.
+
+            ## **Task:**
+            Summarize the most relevant and important insights from the retrieved web content to help answer the following user query:
+
+            ### **User Query:**
+            {user_input}
+
+            ## **Web Content:**
+            {context_from_web}
+
+            ## **Instructions:**
+            1. **Extract Key Insights:** Identify the most valuable information relevant to answering the user’s query.
+            2. **Filter Out Irrelevant Details:** Remove redundant or off-topic content.
+            3. **Summarize Clearly and Concisely:** Provide a structured summary in a few paragraphs or bullet points.
+            4. **Prioritize Recent & Reliable Sources:** Highlight the most authoritative and up-to-date information.
+            5. **Maintain Neutrality:** Present the summary in an objective manner without adding opinions.
+
+            ## **Output Format:**
+            Provide a structured summary that is easy to understand and directly useful in answering the user’s query.
+            """
+            start = time.time()
+            context_from_web = self._call_ollama(web_summary_prompt)
+            print("Average time for word generation: ", (time.time() - start) / len(context_from_web.split()))
+            print(f"-"*15)
+        
+            # Update RAG prompt to include context only if it exists
+            rag_prompt = f"""
+            You are an intelligent assistant designed to provide accurate and context-aware responses. 
+
+            {f'## **Context Information:**\n{context}\n' if context else ''}
+
+            ## **Web Search Results:**
+            {context_from_web}
+
+            ## **User Conversation History (Last {self.number_of_previous_conversations} interactions):**
+            {self._summarize_previous_conversations()}
+
+            ### **Instructions:**
+            1. **Synthesize Information:** Combine relevant details from the provided context, web search results, and past conversations.
+            2. **Prioritize Relevance:** Focus on the most important and up-to-date facts to answer the question accurately.
+            3. **Ensure Clarity & Conciseness:** The response should be clear, well-structured, and concise while covering key points.
+            4. **Avoid Redundancy:** If a previous conversation already addressed this, summarize the past response and add new insights if necessary.
+            5. **Cite Sources If Applicable:** If information is derived from web search results, indicate it subtly.
+
+            ### **User Query:**
+            {user_input}
+
+            ### **Your Response:**
+            """
+        else:
+            # Create RAG prompt without web search results
+            rag_prompt = f"""
+            You are an intelligent assistant designed to provide accurate and context-aware responses. 
+
+            {f'## **Context Information From Database:**\n{context}\n' if context else ''}
+
+            ## **User Conversation History (Last {self.number_of_previous_conversations} interactions):**
+            {self._summarize_previous_conversations()}
+
+            ### **Instructions:**
+            1. **Synthesize Information:** Combine relevant details from the provided context and past conversations.
+            2. **Prioritize Relevance:** Focus on the most important facts to answer the question accurately.
+            3. **Ensure Clarity & Conciseness:** The response should be clear, well-structured, and concise while covering key points.
+            4. **Avoid Redundancy:** If a previous conversation already addressed this, summarize the past response and add new insights if necessary.
+
+            ### **User Query:**
+            {user_input}
+
+            ### **Your Response:**
+            """
+
+            resources = []
 
         # Get response from Ollama
         start = time.time()
@@ -443,8 +472,14 @@ class OllamaRAG:
         
         # Store conversation in database
         self.db.add_conversation(user_input, response)
-        
-        return response , resources
+
+        info = {
+            "performance": self.performance,
+            "web_search": self.web_search,
+            "model": self.model_name,
+            "context_search": self.context_search
+        }
+        return response , resources , info
 
 def main():
     # Initialize RAG system

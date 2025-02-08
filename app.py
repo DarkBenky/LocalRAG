@@ -14,6 +14,12 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "model" not in st.session_state:
     st.session_state.model = CODDER_MODEL_BIG
+if "performance_mode" not in st.session_state:
+    st.session_state.performance_mode = True
+if "search_web" not in st.session_state:
+    st.session_state.search_web = True
+if "context_search" not in st.session_state:
+    st.session_state.context_search = True
 
 # Sidebar for model selection
 with st.sidebar:
@@ -28,8 +34,33 @@ with st.sidebar:
     selected_model = st.selectbox("Select Model", list(model_options.keys()))
     st.session_state.model = model_options[selected_model]
 
-# Initialize RAG with selected model
-rag = OllamaRAG(model_name=st.session_state.model)
+    # Fix: Store selectbox values directly in session state
+    st.session_state.search_web = st.selectbox(
+        "Search Web", 
+        [True, False], 
+        help="Enable or disable web search for resources."
+    )
+    
+    st.session_state.performance_mode = st.selectbox(
+        "Performance Mode", 
+        [True, False], 
+        help="Enable or disable performance mode for faster responses."
+    )
+
+    st.session_state.context_search = st.selectbox(
+        "Context Search", 
+        [True, False], 
+        help="Enable or disable context search for better responses."
+    )
+
+
+# Initialize RAG with updated settings
+rag = OllamaRAG(
+    model_name=st.session_state.model,
+    performance=st.session_state.performance_mode,
+    web_search=st.session_state.search_web,
+    context_search=st.session_state.context_search
+)
 
 # Sidebar
 st.sidebar.title("Navigation")
@@ -70,13 +101,15 @@ if page == "Chat":
             # Generate new response
             with st.chat_message("assistant"):
                 with st.spinner("Thinking..."):
-                    response, resources = rag.chat(prompt)
+                    response, resources, info = rag.chat(prompt)
+                    st.write(info)
                     st.write(response)
                     
                     if resources:
                         with st.expander("Referenced Resources"):
                             for resource in resources:
                                 st.markdown(f"**{resource['name']}**")
+                                st.write(f"URL: {resource.get('url', 'N/A')}")
                                 st.write(f"Description: {resource.get('description', 'N/A')}")
                     
                     # Save response with resources
