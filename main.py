@@ -12,7 +12,7 @@ CODDER_MODEL_SMALL = "qwen2.5-coder:1.5b"
 CODDER_MODEL_SUPPER_SMALL = "qwen2.5-coder:0.5b"
 
 class OllamaRAG:
-    def __init__(self, model_name: str = CODDER_MODEL, db_path: str = "ragV2.db", performance: bool = True):
+    def __init__(self, model_name: str = CODDER_MODEL_SMALL, db_path: str = "ragV2.db", performance: bool = True):
         self.model_name = model_name
         self.api_url = "http://localhost:11434/api/generate"
         self.db = RAGDB(db_path)
@@ -54,7 +54,10 @@ class OllamaRAG:
 
         ### Generated Description:
         """
+        start = time.time()
         description = self._call_ollama(description_prompt)
+        print("Average time for word generation: ", (time.time() - start) / len(description.split()))
+        print(f"-"*15)
 
         tags_prompt = f"""
         You are an AI assistant responsible for generating relevant tags for a given resource.
@@ -71,7 +74,10 @@ class OllamaRAG:
         ### Generated Tags (comma-separated):
         """
 
+        start = time.time()
         tags = self._call_ollama(tags_prompt)
+        print("Average time for word generation: ", (time.time() - start) / len(tags.split()))
+        print(f"-"*15)
 
 
         # **Add resource to the database**
@@ -369,9 +375,12 @@ class OllamaRAG:
         Provide only the search query without additional explanation.
         """
 
+        start = time.time()
         query_for_web = self._call_ollama(query_for_web)
+        print("Average time for word generation: ", (time.time() - start) / len(query_for_web.split()))
+        print(f"-"*15)
 
-        context_from_web , resources = self._find_resources_on_web(query_for_web, num_results=4)
+        context_from_web , resources = self._find_resources_on_web(query_for_web, num_results=3)
         # summarize the context from web
         web_summary_prompt = f"""
         You are an advanced AI assistant designed to extract key information from provided sources.
@@ -395,7 +404,10 @@ class OllamaRAG:
         ## **Output Format:**
         Provide a structured summary that is easy to understand and directly useful in answering the user’s query.
         """
+        start = time.time()
         context_from_web = self._call_ollama(web_summary_prompt)
+        print("Average time for word generation: ", (time.time() - start) / len(context_from_web.split()))
+        print(f"-"*15)
         
         # Create RAG prompt
         rag_prompt = f"""
@@ -424,7 +436,9 @@ class OllamaRAG:
         """
 
         # Get response from Ollama
+        start = time.time()
         response = self._call_ollama(rag_prompt)
+        print("Average time for word generation: ", (time.time() - start) / len(response.split()))
         
         # Store conversation in database
         self.db.add_conversation(user_input, response)
