@@ -19,7 +19,7 @@ def stripThink(text):
     return re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
 
 class OllamaRAG:
-    def __init__(self, model_name: str = CODDER_MODEL, db_path: str = "ragV2.db", performance: bool = True , web_search: bool = True, context_search: bool = True , deep_search: bool = False):
+    def __init__(self, model_name: str = CODDER_MODEL, db_path: str = "ragV2.db", performance: bool = True , web_search: bool = True, context_search: bool = True , deep_search: bool = False, number_of_searches: int = 3):
         self.model_name = model_name
         self.api_url = "http://localhost:11434/api/generate"
         self.db = RAGDB(db_path)
@@ -29,6 +29,7 @@ class OllamaRAG:
         self.web_search = web_search
         self.context_search = context_search
         self.deep_search = deep_search
+        self.number_of_searches = number_of_searches
 
     def _call_ollama(self, prompt: str) -> str:
         payload = {
@@ -376,7 +377,7 @@ class OllamaRAG:
         
         # Get relevant context from database only if enabled
         if self.context_search:
-            context = self._get_relevant_context(user_input)
+            context = self._get_relevant_context(user_input, self.number_of_searches)
             print(f"Context: {context}")
             print("-"*15)
 
@@ -408,7 +409,7 @@ class OllamaRAG:
             print("Average time for word generation: ", (time.time() - start) / len(query_for_web.split()))
             print(f"-"*15)
 
-            context_from_web , resources = self._find_resources_on_web(query_for_web, num_results=3)
+            context_from_web , resources = self._find_resources_on_web(query_for_web, num_results=self.number_of_searches)
 
             if self.deep_search:
                 web_search_deep = f"""
@@ -433,7 +434,7 @@ class OllamaRAG:
                 print("Additional Query for web: ", addition_web_query)
                 print(f"-"*15)
 
-                additional_web_context, additional_resources = self._find_resources_on_web(addition_web_query, num_results=3)
+                additional_web_context, additional_resources = self._find_resources_on_web(addition_web_query, num_results=self.number_of_searches)
                 context_from_web += additional_web_context
                 resources += additional_resources
 
@@ -526,7 +527,10 @@ class OllamaRAG:
             "performance": self.performance,
             "web_search": self.web_search,
             "model": self.model_name,
-            "context_search": self.context_search
+            "context_search": self.context_search,
+            "number_of_searches": self.number_of_searches,
+            "deep_search": self.deep_search,
+            "number_of_previous_conversations": self.number_of_previous_conversations
         }
         return response , resources , info
 

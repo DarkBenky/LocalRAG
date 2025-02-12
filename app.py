@@ -22,6 +22,8 @@ if "context_search" not in st.session_state:
     st.session_state.context_search = True
 if "deep_search" not in st.session_state:
     st.session_state.deep_search = False
+if "number_of_resources" not in st.session_state:
+    st.session_state.number_of_resources = 5
 
 # Sidebar for model selection
 with st.sidebar:
@@ -63,6 +65,14 @@ with st.sidebar:
         "Context Search", 
         [True, False], 
         help="Enable or disable context search for better responses."
+    )
+
+    st.session_state.number_of_resources = st.number_input(
+        "Number of Resources", 
+        min_value=1, 
+        max_value=10, 
+        value=3, 
+        help="Number of resources to display for each response."
     )
 
     
