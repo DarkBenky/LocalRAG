@@ -12,6 +12,7 @@ CODDER_MODEL_SMALL = "qwen2.5-coder:1.5b"
 CODDER_MODEL_SUPPER_SMALL = "qwen2.5-coder:0.5b"
 DEEP_SEEK_MODEL_BIG = "deepseek-r1:32b"
 DEEP_SEEK_MODEL_NORMAL = "deepseek-r1:8b"
+DEEP_SEEK_MODEL_NORMAL_V2 = "deepseek-r1:7b"
 
 
 class OllamaRAG:

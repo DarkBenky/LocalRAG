@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from main import OllamaRAG, CODDER_MODEL, DEEP_SEEK_MODEL, CODDER_MODEL_BIG, CODDER_MODEL_SMALL, DEEP_SEEK_MODEL_BIG, DEEP_SEEK_MODEL_NORMAL
+from main import OllamaRAG, CODDER_MODEL, DEEP_SEEK_MODEL, CODDER_MODEL_BIG, CODDER_MODEL_SMALL, DEEP_SEEK_MODEL_BIG, DEEP_SEEK_MODEL_NORMAL, DEEP_SEEK_MODEL_NORMAL_V2
 
 # Page configuration
 st.set_page_config(
@@ -30,7 +30,8 @@ with st.sidebar:
         "Qwen 1.5B": CODDER_MODEL_SMALL,
         "DeepSeek 32B": DEEP_SEEK_MODEL_BIG,
         "DeepSeek 1.5B": DEEP_SEEK_MODEL,
-        "DeepSeek 8B": DEEP_SEEK_MODEL_NORMAL
+        "DeepSeek 8B": DEEP_SEEK_MODEL_NORMAL,
+        "DeepSeek 7B": DEEP_SEEK_MODEL_NORMAL_V2
     }
     selected_model = st.selectbox("Select Model", list(model_options.keys()))
     st.session_state.model = model_options[selected_model]
