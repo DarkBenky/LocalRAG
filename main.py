@@ -15,6 +15,9 @@ DEEP_SEEK_MODEL_NORMAL = "deepseek-r1:8b"
 DEEP_SEEK_MODEL_NORMAL_V2 = "deepseek-r1:7b"
 
 
+def stripThink(text):
+    return re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+
 class OllamaRAG:
     def __init__(self, model_name: str = CODDER_MODEL, db_path: str = "ragV2.db", performance: bool = True , web_search: bool = True, context_search: bool = True):
         self.model_name = model_name
@@ -62,6 +65,7 @@ class OllamaRAG:
         """
         start = time.time()
         description = self._call_ollama(description_prompt)
+        description = stripThink(description)
         print("Average time for word generation: ", (time.time() - start) / len(description.split()))
         print(f"-"*15)
 
@@ -82,6 +86,7 @@ class OllamaRAG:
 
         start = time.time()
         tags = self._call_ollama(tags_prompt)
+        tags = stripThink(tags)
         print("Average time for word generation: ", (time.time() - start) / len(tags.split()))
         print(f"-"*15)
 
@@ -118,6 +123,7 @@ class OllamaRAG:
         ### Optimized Search Description:
         """
         description = self._call_ollama(search_query_prompt)
+        description = stripThink(description)
 
         if self.performance == False:
             # **Step 2: Search for Initial Resources in the Database**
@@ -149,6 +155,8 @@ class OllamaRAG:
         ### Keywords:
         """
         keywords = self._call_ollama(keywords_prompt).strip()
+        keywords = stripThink(keywords)
+        
 
         # Split keywords and search for additional resources
         keywords = [keyword.strip() for keyword in keywords.split(',')]
@@ -188,6 +196,7 @@ class OllamaRAG:
                 ### Relevance Score:
                 """
                 r = self._call_ollama(rank_prompt)
+                r = stripThink(r)
 
                 print(f"Resource: {resource['name']} - Score: {r}")
                 # print(f"Description: {resource['description']}")
@@ -356,6 +365,7 @@ class OllamaRAG:
             """
 
             tags = self._call_ollama(tags_prompt)
+            tags = stripThink(tags)
             self.db.update_tags(resource[0], tags)
 
 
@@ -388,6 +398,12 @@ class OllamaRAG:
 
             start = time.time()
             query_for_web = self._call_ollama(query_for_web)
+            query_for_web = stripThink(query_for_web)
+            
+            print(f"-"*15)
+            print("Query for web: ", query_for_web)
+            print(f"-"*15)
+
             print("Average time for word generation: ", (time.time() - start) / len(query_for_web.split()))
             print(f"-"*15)
 
@@ -471,6 +487,7 @@ class OllamaRAG:
         # Get response from Ollama
         start = time.time()
         response = self._call_ollama(rag_prompt)
+        # response = stripThink(response)
         print("Average time for word generation: ", (time.time() - start) / len(response.split()))
         
         # Store conversation in database
