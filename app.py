@@ -20,6 +20,8 @@ if "search_web" not in st.session_state:
     st.session_state.search_web = True
 if "context_search" not in st.session_state:
     st.session_state.context_search = True
+if "deep_search" not in st.session_state:
+    st.session_state.deep_search = False
 
 # Sidebar for model selection
 with st.sidebar:
@@ -42,6 +44,14 @@ with st.sidebar:
         [True, False], 
         help="Enable or disable web search for resources."
     )
+
+    if  st.session_state.search_web:
+        st.session_state.deep_search = st.selectbox(
+            "Deep Search", 
+            [True, False], 
+            help="Enable or disable deep search for more accurate responses."
+        )
+
     
     st.session_state.performance_mode = st.selectbox(
         "Performance Mode", 
@@ -55,13 +65,15 @@ with st.sidebar:
         help="Enable or disable context search for better responses."
     )
 
+    
 
 # Initialize RAG with updated settings
 rag = OllamaRAG(
     model_name=st.session_state.model,
     performance=st.session_state.performance_mode,
     web_search=st.session_state.search_web,
-    context_search=st.session_state.context_search
+    context_search=st.session_state.context_search,
+    deep_search=st.session_state.deep_search
 )
 
 # Sidebar

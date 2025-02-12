@@ -19,7 +19,7 @@ def stripThink(text):
     return re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
 
 class OllamaRAG:
-    def __init__(self, model_name: str = CODDER_MODEL, db_path: str = "ragV2.db", performance: bool = True , web_search: bool = True, context_search: bool = True):
+    def __init__(self, model_name: str = CODDER_MODEL, db_path: str = "ragV2.db", performance: bool = True , web_search: bool = True, context_search: bool = True , deep_search: bool = False):
         self.model_name = model_name
         self.api_url = "http://localhost:11434/api/generate"
         self.db = RAGDB(db_path)
@@ -28,6 +28,7 @@ class OllamaRAG:
         self.performance = performance
         self.web_search = web_search
         self.context_search = context_search
+        self.deep_search = deep_search
 
     def _call_ollama(self, prompt: str) -> str:
         payload = {
@@ -408,6 +409,34 @@ class OllamaRAG:
             print(f"-"*15)
 
             context_from_web , resources = self._find_resources_on_web(query_for_web, num_results=3)
+
+            if self.deep_search:
+                web_search_deep = f"""
+                Based on the original user query: "{user_input}" 
+                And the initial web search results: {context_from_web}
+
+                Generate ONE additional search query following these rules:
+                1. Focus on key concepts or topics that need more detail
+                2. Identify gaps in the current search results
+                3. Use specific, relevant keywords
+                4. Keep the query under 10 words
+                5. Exclude generic terms
+                6. Format: clear, concise search terms
+                
+                Return ONLY the search query without explanation.
+                """
+
+                addition_web_query = self._call_ollama(web_search_deep)
+                addition_web_query = stripThink(addition_web_query)
+
+                print(f"-"*15)
+                print("Additional Query for web: ", addition_web_query)
+                print(f"-"*15)
+
+                additional_web_context, additional_resources = self._find_resources_on_web(addition_web_query, num_results=3)
+                context_from_web += additional_web_context
+                resources += additional_resources
+
             # summarize the context from web
             web_summary_prompt = f"""
             You are an advanced AI assistant designed to extract key information from provided sources.
@@ -473,7 +502,7 @@ class OllamaRAG:
             ### **Instructions:**
             1. **Synthesize Information:** Combine relevant details from the provided context and past conversations.
             2. **Prioritize Relevance:** Focus on the most important facts to answer the question accurately.
-            3. **Ensure Clarity & Conciseness:** The response should be clear, well-structured, and concise while covering key points.
+            3. **Ensure Clarity & Concisiveness:** The response should be clear, well-structured, and concise while covering key points.
             4. **Avoid Redundancy:** If a previous conversation already addressed this, summarize the past response and add new insights if necessary.
 
             ### **User Query:**
