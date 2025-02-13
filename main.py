@@ -332,7 +332,7 @@ class OllamaRAG:
 
         # **Format conversations into a structured transcript**
         conversation_log = "\n".join([
-            f"User: {c[1]}\nAssistant: {c[2]}\n" for c in conversations
+            f"User: {c[1]}\nAssistant: {c[2]}\n Time : {c[3]}\n" for c in conversations
         ])
 
         # **Optimized Summary Prompt**
@@ -347,6 +347,7 @@ class OllamaRAG:
         - Extract **important questions, AI responses, and any unresolved issues**.
         - The summary should be **coherent and structured**.
         - Avoid unnecessary details but retain meaningful context.
+        - Keep order of conversations intact.
         
         ### Summary of Conversations:
         """
