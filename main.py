@@ -99,7 +99,7 @@ class OllamaRAG:
         return {"name": name, "description": description, "tags": tags}
 
 
-    def _get_relevant_context(self, query: str, n_results: int = 3) -> str:
+    def _get_relevant_context(self, query: str, n_results: int = 8) -> str:
         """
         Retrieves the most relevant resources based on a query by:
         1. Generating a refined search description.
@@ -212,24 +212,31 @@ class OllamaRAG:
             # **Step 6: Format and Return Context**
             context = "\n".join([f"{r['name']}: {r['content']}" for r in res_list])
 
-        resV2 = self.db._search_resources_new(query, n_results, 2048)
-        resV2 += self.db._search_resources_new(description, n_results, 2048)
+        resV2 = self.db.search_resources(description , n_results)
+        resV2 += self.db.search_resources(query, n_results)
+
         for k in keywords:
-            resV2 += self.db._search_resources_new(k, n_results, 2048)
+            resV2 += self.db.search_resources(k, n_results)
 
-        seen = set()
-        if resV2:
-            resV2 = [x for x in resV2 if x['name'] not in seen and not seen.add(x['name'])]
-            resV2 = sorted(resV2, key=lambda x: float(x['score']), reverse=True)[:n_results]
-            resV2 = "\n\n".join([f"{r['name']}: {r['content']} : {r['description']}" for r in resV2])
-        else:
-            resV2 = ""
-        
+        keyword_text = ""
+        for k in keywords:
+            keyword_text += f"{k} , "
+        resV2 += self.db.search_resources(keyword_text, n_results)
+
+
+        content_set = set()
+
+        text = ""
+        for r in resV2:
+            if r['content'] in content_set:
+                continue
+            content_set.add(r['content'])
+            text += f"{r['name']}: {r['content']}\n\n"
 
         print("-"*15)
-        print("V2 DB query: ",resV2)
+        print("V2 DB query: ",text)
         print("-"*15)
-        context += resV2
+        context += text
         
         return context
 
@@ -264,7 +271,7 @@ class OllamaRAG:
                     # Clean and normalize text
                     content = re.sub(r'\s+', ' ', content)  # Remove extra whitespace
                     content = re.sub(r'[^\w\s.,!?-]', '', content)  # Keep basic punctuation
-                    content = content[:8196]  # Limit content length
+                    content = content[:4096]  # Limit content length
                     
                     # Basic relevance check
                     if not any(term.lower() in content.lower() for term in query.split()):

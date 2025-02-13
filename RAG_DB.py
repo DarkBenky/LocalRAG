@@ -132,14 +132,43 @@ class RAGDB:
             return cursor.fetchall()
         
 
-    def search_resources(self, query: str) -> List[Tuple]:
+    @lru_cache(maxsize=8196)
+    def search_resources(self, query: str, n_results: int = 8) -> list:  # Updated return type
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                'SELECT * FROM resources WHERE name LIKE ? OR description LIKE ? OR content LIKE ? OR tags LIKE ?',
-                (f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%')
-            )
-            return cursor.fetchall()
+            cursor.execute('''
+                SELECT *, 
+                    (CASE 
+                        WHEN name LIKE ? THEN 4
+                        WHEN description LIKE ? THEN 3 
+                        WHEN tags LIKE ? THEN 2
+                        WHEN content LIKE ? THEN 1
+                        ELSE 0
+                    END) as relevance
+                FROM resources 
+                WHERE name LIKE ? 
+                OR description LIKE ? 
+                OR content LIKE ? 
+                OR tags LIKE ?
+                ORDER BY relevance DESC
+                LIMIT ?
+            ''', (
+                f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%',
+                f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%',
+                n_results
+            ))
+            
+            results = cursor.fetchall()
+            return [
+                {
+                    'name': row[1],
+                    'description': row[2],
+                    'content': row[3],
+                    'tags': row[5],
+                    'relevance': row[-1]  # Added relevance score
+                }
+                for row in results
+            ]
     
     @lru_cache(maxsize=4096)
     def _search_resources_new(self, query: str, n_results: int = 3, content_length : int = 2048) -> list:
@@ -198,3 +227,14 @@ class RAGDB:
         except Exception as e:
             print(f"Search error: {str(e)}")
             return ""
+        
+if __name__ == "__main__":
+    db = RAGDB()
+    print(db.search_resources("xylo"))
+    res = db.search_resources("xylo")
+    print(db._search_resources_new("xylo"))
+    res_new = db._search_resources_new("xylo")
+    print(db._search_resources_new("singer"))
+    res1 = db.search_resources("singer")
+    print(db.search_resources("singer"))
+    res1_new = db._search_resources_new("singer")
