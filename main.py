@@ -318,7 +318,7 @@ class OllamaRAG:
             print(f"Error searching web: {str(e)}")
             return "" , []
     
-    def _summarize_previous_conversations(self) -> str:
+    def _summarize_previous_conversations(self, prompt : str) -> str:
         """
         Retrieves and summarizes the last N conversations with the user.
 
@@ -337,18 +337,21 @@ class OllamaRAG:
 
         # **Optimized Summary Prompt**
         summary_prompt = f"""
-        You are an AI summarization assistant responsible for condensing past conversations.
+        You are an AI summarization assistant responsible for condensing past conversations into relevant insights.
+
+        ### User Query:
+        {prompt}
 
         ### Previous {self.number_of_previous_conversations} Conversations:
         {conversation_log}
 
         ### Instructions:
-        - Provide a **concise yet detailed** summary of key topics discussed.
-        - Extract **important questions, AI responses, and any unresolved issues**.
-        - The summary should be **coherent and structured**.
-        - Avoid unnecessary details but retain meaningful context.
-        - Keep order of conversations intact.
-        
+        - Provide a **concise and detailed** summary of key topics discussed.
+        - Highlight important questions, AI responses, and any unresolved issues.
+        - Ensure the summary is **coherent and well-structured**.
+        - Retain meaningful context while avoiding unnecessary details.
+        - Maintain the chronological order of conversations.
+
         ### Summary of Conversations:
         """
         
@@ -484,12 +487,12 @@ class OllamaRAG:
             {context_from_web}
 
             ## **User Conversation History (Last {self.number_of_previous_conversations} interactions):**
-            {self._summarize_previous_conversations()}
+            {self._summarize_previous_conversations(user_input)}
 
             ### **Instructions:**
             1. **Synthesize Information:** Combine relevant details from the provided context, web search results, and past conversations.
             2. **Prioritize Relevance:** Focus on the most important and up-to-date facts to answer the question accurately.
-            3. **Ensure Clarity & Conciseness:** The response should be clear, well-structured, and concise while covering key points.
+            3. **Ensure Clarity & Concisiveness:** The response should be clear, well-structured, and concise while covering key points.
             4. **Avoid Redundancy:** If a previous conversation already addressed this, summarize the past response and add new insights if necessary.
             5. **Cite Sources If Applicable:** If information is derived from web search results, indicate it subtly.
 
@@ -506,7 +509,7 @@ class OllamaRAG:
             {f'## **Context Information From Database:**\n{context}\n' if context else ''}
 
             ## **User Conversation History (Last {self.number_of_previous_conversations} interactions):**
-            {self._summarize_previous_conversations()}
+            {self._summarize_previous_conversations(user_input)}
 
             ### **Instructions:**
             1. **Synthesize Information:** Combine relevant details from the provided context and past conversations.
